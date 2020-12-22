@@ -8,7 +8,7 @@ from typing import NewType, NamedTuple, Union, Optional
 from PIL import Image, ImageFont
 from PIL.ImageDraw import Draw
 
-version = 2
+version = 2.1
 
 ACoord = NewType("ACoord", int)
 BCoord = NewType("BCoord", Union[int, float])
@@ -74,7 +74,8 @@ BACKGROUND_COLOR: tuple = (255, 255, 255)
 spheres = [
     Sphere(Vector(BCoord(0), BCoord(-1), BCoord(3)), 1, (255, 0, 0)),
     Sphere(Vector(BCoord(2), BCoord(0), BCoord(4)), 1, (0, 0, 255)),
-    Sphere(Vector(BCoord(-2), BCoord(0), BCoord(4)), 1, (0, 255, 0))
+    Sphere(Vector(BCoord(-2), BCoord(0), BCoord(4)), 1, (0, 255, 0)),
+    Sphere(Vector(BCoord(0), BCoord(-5001), BCoord(0)), 5000, (255, 255, 0)),
 ]
 
 lights = [
