@@ -1,8 +1,10 @@
 import time
 from functools import lru_cache
 from math import inf, sqrt
-from tkinter import Tk, Canvas
 from typing import NewType, NamedTuple, Union
+
+from PIL import Image
+from PIL.ImageDraw import Draw
 
 ACoord = NewType("ACoord", int)
 BCoord = NewType("BCoord", Union[int, float])
@@ -32,8 +34,6 @@ class Sphere(NamedTuple):
     color: str
 
 
-master = Tk()
-
 canvas_width: int = 800
 canvas_height: int = 800
 
@@ -49,12 +49,11 @@ spheres = [
     Sphere(Point(BCoord(-2), BCoord(0), BCoord(4)), 1, "green")
 ]
 
-w = Canvas(master,
-           width=canvas_width,
-           height=canvas_height,
-           background=BACKGROUND_COLOR
-           )
-w.pack()
+img = Image.new(mode="RGB",
+                size=(canvas_width, canvas_height),
+                color=BACKGROUND_COLOR,
+                )
+draw = Draw(img)
 
 
 # converting coordinate system
@@ -106,10 +105,10 @@ for xt in range(canvas_width):
         decode(xtt, ytt)
 
 
-def put_pixel(x: BCoord, y: BCoord, color: str, canvas: Canvas = w) -> None:
+def put_pixel(x: BCoord, y: BCoord, color: str, draw: Draw = draw) -> None:
     x, y = decode(x, y)
     if not (x < 0 or x > canvas_width or y < 0 or y > canvas_height):
-        canvas.create_line(x, y, x + 1, y + 1, fill=color)
+        draw.point(xy=(x, y), fill=color)
 
 
 def canvas_to_viewport(x: BCoord, y: BCoord, d: BCoord = BCoord(projection_plane_z)) -> Vector:
@@ -163,9 +162,10 @@ def main():
 
     stop = time.time() - start
 
-    w.create_text(canvas_width // 2, 30, text=f"rendered in {stop} seconds", fill="black")
+    draw.text(xy=(canvas_width // 3, 30), text=f"rendered in {stop} seconds", fill="black")
 
 
 if __name__ == '__main__':
     main()
-    w.mainloop()
+    img.show()
+    img.save('v1.png', "png", compress_level=0)
