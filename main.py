@@ -1,10 +1,14 @@
+from __future__ import annotations
+
 import time
 from functools import lru_cache
 from math import inf, sqrt
-from typing import NewType, NamedTuple, Union
+from typing import NewType, NamedTuple, Union, Optional
 
-from PIL import Image
+from PIL import Image, ImageFont
 from PIL.ImageDraw import Draw
+
+version = 2
 
 ACoord = NewType("ACoord", int)
 BCoord = NewType("BCoord", Union[int, float])
@@ -15,23 +19,47 @@ class Vector(NamedTuple):
     y: BCoord
     z: BCoord
 
-    def __mul__(self, other) -> int:
+    def __mul__(self, other: Vector) -> int:
+        """Dot product of two 3D vectors."""
         return sum(BCoord(c1 * c2) for c1, c2 in zip(self, other))
 
+    def __pow__(self, power: Union[float, int]) -> Vector:
+        """Computes k * vec"""
+        return Vector(*tuple(BCoord(c1 * power) for c1 in self))
 
-class Point(NamedTuple):
-    x: BCoord
-    y: BCoord
-    z: BCoord
+    def __rpow__(self, power):
+        """Computes k * vec"""
+        return self.__pow__(power)
 
-    def __sub__(self, other) -> Vector:
+    def __sub__(self, other: Vector) -> Vector:
+        """Computes v1 - v2"""
         return Vector(*tuple(BCoord(c1 - c2) for c1, c2 in zip(self, other)))
+
+    def __add__(self, other: Vector) -> Vector:
+        """Computes v1 + v2"""
+        return Vector(*tuple(BCoord(c1 + c2) for c1, c2 in zip(self, other)))
+
+    def __len__(self):
+        """Length of a 3D vector."""
+        return sqrt(self.__mul__(self))
+
+
+# print(Vector(1, 1, 1) ** 3)
+# print(3 ** Vector(1, 1, 1))
+# exit()
 
 
 class Sphere(NamedTuple):
-    center: Point
+    center: Vector
     radius: int
-    color: str
+    color: tuple
+
+
+class Light(NamedTuple):
+    type: str
+    intensity: float
+    position: Vector = None
+    direction: Vector = None
 
 
 canvas_width: int = 800
@@ -39,14 +67,20 @@ canvas_height: int = 800
 
 viewport_size: int = 1
 projection_plane_z: int = 1
-camera_position: Point = Point(BCoord(0), BCoord(0), BCoord(0))
+camera_position: Vector = Vector(BCoord(0), BCoord(0), BCoord(0))
 
-BACKGROUND_COLOR: str = "white"
+BACKGROUND_COLOR: tuple = (255, 255, 255)
 
 spheres = [
-    Sphere(Point(BCoord(0), BCoord(-1), BCoord(3)), 1, "red"),
-    Sphere(Point(BCoord(2), BCoord(0), BCoord(4)), 1, "blue"),
-    Sphere(Point(BCoord(-2), BCoord(0), BCoord(4)), 1, "green")
+    Sphere(Vector(BCoord(0), BCoord(-1), BCoord(3)), 1, (255, 0, 0)),
+    Sphere(Vector(BCoord(2), BCoord(0), BCoord(4)), 1, (0, 0, 255)),
+    Sphere(Vector(BCoord(-2), BCoord(0), BCoord(4)), 1, (0, 255, 0))
+]
+
+lights = [
+    Light(type="ambient", intensity=0.2),
+    Light(type="point", intensity=0.6, position=Vector(BCoord(2), BCoord(1), BCoord(0))),
+    Light(type="directional", intensity=0.2, direction=Vector(BCoord(1), BCoord(4), BCoord(4))),
 ]
 
 img = Image.new(mode="RGB",
@@ -115,8 +149,25 @@ def canvas_to_viewport(x: BCoord, y: BCoord, d: BCoord = BCoord(projection_plane
     return Vector(BCoord(x * viewport_size / canvas_width), BCoord(y * viewport_size / canvas_height), d)
 
 
-def intersect_ray_sphere(origin: Point, direction_ray: Vector, sphere: Sphere) -> (float, float):
-    center: Point = sphere.center
+def compute_lighting(point: Vector, normal: Vector) -> float:
+    i = 0.0
+    for light in lights:
+        if light.type == "ambient":
+            i += light.intensity
+        else:
+            if light.type == "point":
+                L: Vector = light.position - point
+            else:
+                L: Vector = light.direction
+
+            n_dot_l: float = normal * L
+            if n_dot_l > 0:
+                i += light.intensity * n_dot_l / (normal.__len__() * L.__len__())
+    return i
+
+
+def intersect_ray_sphere(origin: Vector, direction_ray: Vector, sphere: Sphere) -> (float, float):
+    center: Vector = sphere.center
     radius: int = sphere.radius
     oc: Vector = origin - center
 
@@ -132,9 +183,9 @@ def intersect_ray_sphere(origin: Point, direction_ray: Vector, sphere: Sphere) -
     return t1, t2
 
 
-def trace_ray(origin: Point, direction_ray: Vector, t_min: float, t_max: float):
-    closest_t = t_max
-    closest_sphere = None
+def trace_ray(origin: Vector, direction_ray: Vector, t_min: float, t_max: float) -> Union[str, tuple]:
+    closest_t: float = t_max
+    closest_sphere: Optional[Sphere] = None
     for sphere in spheres:
         t1, t2 = intersect_ray_sphere(origin, direction_ray, sphere)
         if t1 < closest_t and t_min < t1 < t_max:
@@ -145,7 +196,13 @@ def trace_ray(origin: Point, direction_ray: Vector, t_min: float, t_max: float):
             closest_sphere = sphere
     if closest_sphere is None:
         return BACKGROUND_COLOR
-    return closest_sphere.color
+
+    point: Vector = origin + closest_t ** direction_ray
+    normal: Vector = point - closest_sphere.center
+    normal: Vector = (1 / normal.__len__()) ** normal
+
+    cl = compute_lighting(point, normal)
+    return tuple(map(lambda color: int(cl * color), closest_sphere.color))
 
 
 def main():
@@ -162,10 +219,18 @@ def main():
 
     stop = time.time() - start
 
-    draw.text(xy=(canvas_width // 3, 30), text=f"rendered in {stop} seconds", fill="black")
+    font = ImageFont.truetype("/usr/share/fonts/noto/NotoSans-Regular.ttf", 16)
+
+    draw.text(
+        xy=(canvas_width // 3, 30),
+        text=f"v{version}\nrendered in {stop} seconds",
+        fill="black",
+        align="center",
+        font=font,
+    )
 
 
 if __name__ == '__main__':
     main()
     img.show()
-    img.save('v1.png', "png", compress_level=0)
+    img.save(f'v{version}.png', "png", compress_level=0)
