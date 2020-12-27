@@ -8,7 +8,7 @@ from typing import NamedTuple, Union, Optional
 from PIL import Image, ImageFont
 from PIL.ImageDraw import Draw
 
-version = 4
+version = "5,2"
 
 
 class Vector(NamedTuple):
@@ -51,6 +51,7 @@ class Sphere(NamedTuple):
     radius: int
     color: tuple
     specular: int
+    reflective: float
 
 
 class Light(NamedTuple):
@@ -66,33 +67,38 @@ canvas_height: int = 800
 viewport_size: int = 1
 projection_plane_z: int = 1
 camera_position: Vector = Vector(0, 0, 0)
+recursion_depth = 5
 
-BACKGROUND_COLOR: tuple = (255, 255, 255)
+BACKGROUND_COLOR: Vector = Vector(255, 255, 255)
 
 spheres = [
     Sphere(
         Vector(0, -1, 3),
         1,
         (255, 0, 0),
-        500
+        500,
+        0.2
     ),
     Sphere(
         Vector(1.7, 0, 4),
         1,
         (0, 0, 255),
-        500
+        500,
+        0.3
     ),
     Sphere(
         Vector(-1.8, 0, 4),
         1,
         (0, 255, 0),
-        10
+        10,
+        0.4
     ),
     Sphere(
         Vector(0, -5001, 0),
         5000,
         (255, 255, 0),
-        1000
+        1000,
+        0.5
     ),
 ]
 
@@ -168,6 +174,10 @@ def canvas_to_viewport(x: int, y: int, d: int = projection_plane_z) -> Vector:
     return Vector(x * viewport_size / canvas_width, y * viewport_size / canvas_height, d)
 
 
+def reflect_ray(point: Vector, normal: Vector) -> Vector:
+    return (normal ** (2 * (normal * point))) - point
+
+
 def compute_lighting(point: Vector, normal: Vector, view: Vector, specular: int) -> float:
     i = 0.0
     length_normal = normal.__len__()
@@ -194,7 +204,7 @@ def compute_lighting(point: Vector, normal: Vector, view: Vector, specular: int)
 
             # Specular
             if specular != -1:
-                vec_r: Vector = normal ** (2 * (normal * vec_l)) - vec_l
+                vec_r: Vector = reflect_ray(vec_l, normal)
                 r_dot_v: float = vec_r * view
                 if r_dot_v > 0:
                     i += light.intensity * ((r_dot_v / (vec_r.__len__() * view.__len__())) ** specular)
@@ -234,18 +244,28 @@ def closest_intersection(origin: Vector, direction_ray: Vector, t_min: float, t_
     return closest_sphere, closest_t
 
 
-def trace_ray(origin: Vector, direction_ray: Vector, t_min: float, t_max: float) -> Union[str, tuple]:
+def trace_ray(origin: Vector, direction_ray: Vector, t_min: float, t_max: float, depth: int) -> Vector:
     closest_sphere, closest_t = closest_intersection(origin, direction_ray, t_min, t_max)
     if closest_sphere is None:
         return BACKGROUND_COLOR
 
+    # Compute local color
     point: Vector = origin + closest_t ** direction_ray
     normal: Vector = point - closest_sphere.center
     normal: Vector = (1 / normal.__len__()) ** normal
-
     view: Vector = direction_ray ** -1
     cl = compute_lighting(point, normal, view, closest_sphere.specular)
-    return cl * closest_sphere.color[0], cl * closest_sphere.color[1], cl * closest_sphere.color[2]
+    local_color: Vector = Vector(cl * closest_sphere.color[0], cl * closest_sphere.color[1], cl * closest_sphere.color[2])
+
+    # If we hit the recursion limit or the object is not reflective, we're done
+    r: float = closest_sphere.reflective
+    if depth <= 0 or r <= 0:
+        return local_color
+
+    # Compute the reflected color
+    reflected_ray: Vector = reflect_ray(view, normal)
+    reflected_color: Vector = trace_ray(point, reflected_ray, 0.001, inf, depth - 1)
+    return ((1 - r) ** local_color) + (r ** reflected_color)
 
 
 def main():
@@ -254,7 +274,7 @@ def main():
     for x in range(-canvas_width // 2, canvas_width // 2):
         for y in range(-canvas_height // 2, canvas_height // 2):
             direction_ray = canvas_to_viewport(x, y)
-            color = trace_ray(camera_position, direction_ray, 1, inf)
+            color = trace_ray(camera_position, direction_ray, 1, inf, recursion_depth)
             if color != BACKGROUND_COLOR:
                 put_pixel(x, y, color)
 
@@ -273,5 +293,5 @@ def main():
 
 if __name__ == '__main__':
     main()
-    # img.show()
-    # img.save(f'v{version}.png', "png", compress_level=0)
+    img.show()
+    img.save(f'v{version}.png', "png", compress_level=0)
