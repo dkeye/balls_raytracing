@@ -8,7 +8,7 @@ from typing import NamedTuple, Union, Optional
 from PIL import Image, ImageFont
 from PIL.ImageDraw import Draw
 
-version = 3
+version = 4
 
 
 class Vector(NamedTuple):
@@ -171,15 +171,21 @@ def canvas_to_viewport(x: int, y: int, d: int = projection_plane_z) -> Vector:
 def compute_lighting(point: Vector, normal: Vector, view: Vector, specular: int) -> float:
     i = 0.0
     length_normal = normal.__len__()
-    length_view = view.__len__()
     for light in lights:
         if light.type == "ambient":
             i += light.intensity
         else:
             if light.type == "point":
                 vec_l: Vector = light.position - point
+                t_max = 1
             else:
                 vec_l: Vector = light.direction
+                t_max = inf
+
+            # Shadow check
+            shadow_sphere, shadow_t = closest_intersection(point, vec_l, 0.001, t_max)
+            if shadow_sphere is not None:
+                continue
 
             # Diffuse
             n_dot_l: float = normal * vec_l
@@ -191,7 +197,7 @@ def compute_lighting(point: Vector, normal: Vector, view: Vector, specular: int)
                 vec_r: Vector = normal ** (2 * (normal * vec_l)) - vec_l
                 r_dot_v: float = vec_r * view
                 if r_dot_v > 0:
-                    i += light.intensity * ((r_dot_v / (vec_r.__len__() * length_view)) ** specular)
+                    i += light.intensity * ((r_dot_v / (vec_r.__len__() * view.__len__())) ** specular)
 
     return i
 
@@ -214,7 +220,7 @@ def intersect_ray_sphere(origin: Vector, direction_ray: Vector, sphere: Sphere) 
     return t1, t2
 
 
-def trace_ray(origin: Vector, direction_ray: Vector, t_min: float, t_max: float) -> Union[str, tuple]:
+def closest_intersection(origin: Vector, direction_ray: Vector, t_min: float, t_max: float) -> (Sphere, float):
     closest_t: float = t_max
     closest_sphere: Optional[Sphere] = None
     for sphere in spheres:
@@ -225,6 +231,11 @@ def trace_ray(origin: Vector, direction_ray: Vector, t_min: float, t_max: float)
         if t2 < closest_t and t_min < t2 < t_max:
             closest_t = t2
             closest_sphere = sphere
+    return closest_sphere, closest_t
+
+
+def trace_ray(origin: Vector, direction_ray: Vector, t_min: float, t_max: float) -> Union[str, tuple]:
+    closest_sphere, closest_t = closest_intersection(origin, direction_ray, t_min, t_max)
     if closest_sphere is None:
         return BACKGROUND_COLOR
 
@@ -262,5 +273,5 @@ def main():
 
 if __name__ == '__main__':
     main()
-    img.show()
+    # img.show()
     # img.save(f'v{version}.png', "png", compress_level=0)
