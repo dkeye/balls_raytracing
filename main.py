@@ -8,7 +8,7 @@ from typing import NamedTuple, Union, Optional
 from PIL import Image, ImageFont
 from PIL.ImageDraw import Draw
 
-version = 2.2
+version = 3
 
 
 class Vector(NamedTuple):
@@ -50,6 +50,7 @@ class Sphere(NamedTuple):
     center: Vector
     radius: int
     color: tuple
+    specular: int
 
 
 class Light(NamedTuple):
@@ -69,10 +70,30 @@ camera_position: Vector = Vector(0, 0, 0)
 BACKGROUND_COLOR: tuple = (255, 255, 255)
 
 spheres = [
-    Sphere(Vector(0, -1, 3), 1, (255, 0, 0)),
-    Sphere(Vector(2, 0, 4), 1, (0, 0, 255)),
-    Sphere(Vector(-2, 0, 4), 1, (0, 255, 0)),
-    Sphere(Vector(0, -5001, 0), 5000, (255, 255, 0)),
+    Sphere(
+        Vector(0, -1, 3),
+        1,
+        (255, 0, 0),
+        500
+    ),
+    Sphere(
+        Vector(1.7, 0, 4),
+        1,
+        (0, 0, 255),
+        500
+    ),
+    Sphere(
+        Vector(-1.8, 0, 4),
+        1,
+        (0, 255, 0),
+        10
+    ),
+    Sphere(
+        Vector(0, -5001, 0),
+        5000,
+        (255, 255, 0),
+        1000
+    ),
 ]
 
 lights = [
@@ -147,20 +168,31 @@ def canvas_to_viewport(x: int, y: int, d: int = projection_plane_z) -> Vector:
     return Vector(x * viewport_size / canvas_width, y * viewport_size / canvas_height, d)
 
 
-def compute_lighting(point: Vector, normal: Vector) -> float:
+def compute_lighting(point: Vector, normal: Vector, view: Vector, specular: int) -> float:
     i = 0.0
+    length_normal = normal.__len__()
+    length_view = view.__len__()
     for light in lights:
         if light.type == "ambient":
             i += light.intensity
         else:
             if light.type == "point":
-                L: Vector = light.position - point
+                vec_l: Vector = light.position - point
             else:
-                L: Vector = light.direction
+                vec_l: Vector = light.direction
 
-            n_dot_l: float = normal * L
+            # Diffuse
+            n_dot_l: float = normal * vec_l
             if n_dot_l > 0:
-                i += light.intensity * n_dot_l / (normal.__len__() * L.__len__())
+                i += light.intensity * n_dot_l / (length_normal * vec_l.__len__())
+
+            # Specular
+            if specular != -1:
+                vec_r: Vector = normal ** (2 * (normal * vec_l)) - vec_l
+                r_dot_v: float = vec_r * view
+                if r_dot_v > 0:
+                    i += light.intensity * ((r_dot_v / (vec_r.__len__() * length_view)) ** specular)
+
     return i
 
 
@@ -200,7 +232,8 @@ def trace_ray(origin: Vector, direction_ray: Vector, t_min: float, t_max: float)
     normal: Vector = point - closest_sphere.center
     normal: Vector = (1 / normal.__len__()) ** normal
 
-    cl = compute_lighting(point, normal)
+    view: Vector = direction_ray ** -1
+    cl = compute_lighting(point, normal, view, closest_sphere.specular)
     return cl * closest_sphere.color[0], cl * closest_sphere.color[1], cl * closest_sphere.color[2]
 
 
