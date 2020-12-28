@@ -8,7 +8,7 @@ from typing import NamedTuple, Union, Optional
 from PIL import Image, ImageFont
 from PIL.ImageDraw import Draw
 
-version = "5,2"
+version = "5,5"
 
 
 class Vector(NamedTuple):
@@ -61,15 +61,24 @@ class Light(NamedTuple):
     direction: Vector = None
 
 
-canvas_width: int = 800
-canvas_height: int = 800
+canvas_width: int = 400
+canvas_height: int = 400
 
 viewport_size: int = 1
+
+
+class Viewport(NamedTuple):
+    width: int = 1
+    height: int = 1
+
+
+viewport = Viewport()
+
 projection_plane_z: int = 1
 camera_position: Vector = Vector(0, 0, 0)
-recursion_depth = 5
+recursion_depth = 3
 
-BACKGROUND_COLOR: Vector = Vector(255, 255, 255)
+BACKGROUND_COLOR: Vector = Vector(0, 0, 0)
 
 spheres = [
     Sphere(
@@ -98,7 +107,7 @@ spheres = [
         5000,
         (255, 255, 0),
         1000,
-        0.5
+        0.1
     ),
 ]
 
@@ -163,7 +172,7 @@ for xt in range(canvas_width):
         decode(xtt, ytt)
 
 
-def put_pixel(x: int, y: int, color: str, draw: Draw = draw) -> None:
+def put_pixel(x: int, y: int, color: Vector, draw: Draw = draw) -> None:
     x, y = decode(x, y)
     if not (x < 0 or x > canvas_width or y < 0 or y > canvas_height):
         color = int(color[0]), int(color[1]), int(color[2])
@@ -171,7 +180,7 @@ def put_pixel(x: int, y: int, color: str, draw: Draw = draw) -> None:
 
 
 def canvas_to_viewport(x: int, y: int, d: int = projection_plane_z) -> Vector:
-    return Vector(x * viewport_size / canvas_width, y * viewport_size / canvas_height, d)
+    return Vector(x * viewport.width / canvas_width, y * viewport.height / canvas_height, d)
 
 
 def reflect_ray(point: Vector, normal: Vector) -> Vector:
@@ -280,12 +289,12 @@ def main():
 
     stop = time.time() - start
 
-    font = ImageFont.truetype("/usr/share/fonts/noto/NotoSans-Regular.ttf", 16)
+    font = ImageFont.truetype("/usr/share/fonts/noto/NotoSans-Regular.ttf", 12)
 
     draw.text(
-        xy=(canvas_width // 3, 30),
-        text=f"v{version}\nrendered in {stop} seconds",
-        fill="black",
+        xy=(canvas_width // 3, 15),
+        text=f"v{version}\nrendered in {stop:.3f} seconds",
+        fill="white",
         align="center",
         font=font,
     )
@@ -294,4 +303,4 @@ def main():
 if __name__ == '__main__':
     main()
     img.show()
-    img.save(f'v{version}.png', "png", compress_level=0)
+    # img.save(f'v{version}.png', "png", compress_level=0)
