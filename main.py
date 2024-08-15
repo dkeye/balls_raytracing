@@ -1,7 +1,6 @@
 import pygame
-from components import Vector, Color, Viewport
-from geometry import Sphere, Light
-from render import render_scene, rotate_scene
+
+from cython_components import Sphere, Light, Vector, Color, Viewport, render_scene, rotate_scene
 
 version = "6"
 
@@ -28,6 +27,7 @@ lights = [
 
 viewport = Viewport(width=1, height=1)
 
+
 def main():
     pygame.init()
     screen = pygame.display.set_mode((canvas_width, canvas_height))
@@ -38,7 +38,7 @@ def main():
 
     rotation_angle = 0
     rotate_left = True
-    max_angle = 10
+    max_angle = 0.6
     running = True
 
     while running:
@@ -54,7 +54,8 @@ def main():
         rotate_scene(rotation_angle, spheres)
 
         screen.fill(BACKGROUND_COLOR.as_tuple())
-        render_scene(screen, canvas_width, canvas_height, spheres, lights, BACKGROUND_COLOR, camera_position, recursion_depth, viewport)
+        render_scene(screen, canvas_width, canvas_height, spheres, lights, BACKGROUND_COLOR, camera_position,
+                     recursion_depth, viewport)
 
         frame_time = pygame.time.get_ticks() - start_time
         if frame_time > 0:

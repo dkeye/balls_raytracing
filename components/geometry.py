@@ -1,7 +1,7 @@
 from math import sqrt
 from typing import Optional, Tuple
 
-from components.color import Color, Vector
+from cython_components import Color, Vector
 
 
 class Sphere:
@@ -61,8 +61,8 @@ def trace_ray(origin: Vector, direction_ray: Vector, t_min: float, t_max: float,
     if closest_sphere is None:
         return background_color
 
-    point = origin + closest_t ** direction_ray
-    normal = (point - closest_sphere.center) ** (1 / (point - closest_sphere.center).length)
+    point = origin + direction_ray.scale(closest_t)
+    normal = (point - closest_sphere.center) ** (1 / (point - closest_sphere.center).length())
     view = direction_ray ** -1
 
     # Compute local color
@@ -74,13 +74,13 @@ def trace_ray(origin: Vector, direction_ray: Vector, t_min: float, t_max: float,
 
     reflected_ray = reflect_ray(view, normal)
     reflected_color = trace_ray(point, reflected_ray, 0.001, float('inf'), depth - 1, spheres, lights, background_color)
-    result = ((1 - closest_sphere.reflective) ** local_color) + (closest_sphere.reflective ** reflected_color)
+    result = (local_color.scale(1 - closest_sphere.reflective)) + (reflected_color.scale(closest_sphere.reflective))
     return Color(result.x, result.y, result.z)
 
 
 def compute_lighting(point: Vector, normal: Vector, view: Vector, specular: int, lights: list[Light], spheres: list[Sphere]) -> float:
     intensity = 0.0
-    length_normal = normal.length
+    length_normal = normal.length()
 
     for light in lights:
         if light.type == "ambient":
@@ -99,13 +99,13 @@ def compute_lighting(point: Vector, normal: Vector, view: Vector, specular: int,
 
             n_dot_l = normal * vec_l
             if n_dot_l > 0:
-                intensity += light.intensity * n_dot_l / (length_normal * vec_l.length)
+                intensity += light.intensity * n_dot_l / (length_normal * vec_l.length())
 
             if specular != -1:
                 vec_r = reflect_ray(vec_l, normal)
                 r_dot_v = vec_r * view
                 if r_dot_v > 0:
-                    intensity += light.intensity * ((r_dot_v / (vec_r.length * view.length)) ** specular)
+                    intensity += light.intensity * ((r_dot_v / (vec_r.length() * view.length())) ** specular)
 
     return intensity
 
