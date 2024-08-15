@@ -1,4 +1,4 @@
-![alt text](https://raw.githubusercontent.com/dkeye/balls_raytracing/cython_optimization/v6_cython.png![v6_cython.png](v6_cython.png))
+![alt text](https://raw.githubusercontent.com/dkeye/balls_raytracing/62daedd2bada9900401174eab07ff6bc6070566c/v6_cython.png)
 
 ## How to run cython code
 ```bash
